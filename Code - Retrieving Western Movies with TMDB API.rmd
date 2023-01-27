@@ -1,0 +1,184 @@
+---
+title: "Retrieving Western Movies with TMDB API"
+author: "Ahmet Yiğit Doğan"
+date: "14 Dec, 2022"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 1
+    number_sections: yes
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, fig.align="center")
+```
+
+\newpage
+
+# Introduction
+
+In this study, an API call will be sent to the The Movie Database (TMDB) servers to retrieve a list of Italian Western Movies. The resulting table will include th first 20 movies with the highest number of user votes. 
+
+One can access to the API details by clicking [here](https://developers.themoviedb.org/3/getting-started). The API provides a variety of features to get movies and TV Shows related data such as cast, synopsis, user votes, and country based statistics.
+
+The steps taken during the preparation of this report can be summarized as follows:
+
+- Receiving an API Key by following the 4 steps addressed [here](https://developers.themoviedb.org/3/getting-started/introduction).
+
+- Setting up an R Markdown file and preparing the environment by installing the related packages.
+
+- Performing test calls to check whether the environment is working.
+
+- Calling the base URL's and extending them with additional queries to obtain more specific results.
+
+```{r intro}
+
+# Installing the required R packages
+# install.packages("httr")
+# install.packages("jsonlite")
+
+# Library imports
+
+library("httr")
+library("jsonlite")
+
+# Setting the API key
+
+api_key <- "{Insert your API key here}"
+
+# Defining a function to concatenate URL's and query strings easily
+
+extend_URL <- function(URL, query_string){
+    
+    result <- paste(URL, "&", query_string, sep ="")
+    return(result)
+    
+}
+
+```
+
+\newpage
+
+# API Call for Genres
+
+First, the list of official genre labels used in the website should be retrieved. 
+
+```{r genre}
+
+# URL template for the "genre" call
+
+genre <- "https://api.themoviedb.org/3/genre/movie/list?api_key=<<api_key>>"
+
+# Setting the language
+
+genre <- extend_URL(genre, "language=en-US")
+
+# Inserting the API key to the template
+
+genre <- gsub("<<api_key>>", api_key, genre)
+
+# Performing the call
+
+genre_call <- httr::GET(genre)
+
+# Checking the status of the call
+
+genre_call$status_code
+
+```
+
+The status code implies that the call was successful. The next step is finding out the genre ID of "western".
+
+\newpage
+
+# API Call for Genres - Results
+
+```{r id}
+
+# Converting the call results to an easily readable list
+
+genre_char <- base::rawToChar(genre_call$content)
+
+genre_json <- jsonlite::fromJSON(genre_char, flatten = TRUE)
+
+knitr::kable(genre_json$genres)
+
+```
+
+\newpage
+
+# API Call for Movie Discovery
+
+```{r discover}
+
+# URL template for the "discover" call
+
+discover <- "https://api.themoviedb.org/3/discover/movie?api_key=<<api_key>>"
+
+# Setting the language
+
+discover <- extend_URL(discover, "language=en-US")
+
+# Retrieve the movies with highest number of votes
+
+discover <- extend_URL(discover, "sort_by=vote_count.desc")
+
+# Filtering by genre (Western's genre id is 37)
+
+discover <- extend_URL(discover, "with_genres=37")
+
+# Filtering by original language (Italian)
+
+discover <- extend_URL(discover, "with_original_language=it")
+
+# Inserting the API key to the template
+
+discover <- gsub("<<api_key>>", api_key, discover)
+
+# Performing the call
+
+discover_call <- httr::GET(discover)
+
+# Checking the status of the call
+
+discover_call$status_code
+
+```
+
+The call was successful.
+
+\newpage
+
+# API Call for Movie Discovery - Results
+
+```{r movies}
+
+# Converting the call results to an easily readable list
+
+discover_char <- base::rawToChar(discover_call$content)
+
+discover_json <- jsonlite::fromJSON(discover_char, flatten = TRUE)
+
+results <- discover_json$results
+
+# Checking the retrieved field names
+
+colnames(results)
+
+```
+
+\newpage
+
+# Final Results
+
+Finally, a clean summary table consisting of basic movie information can be generated as follows:
+
+```{r final}
+
+table <- results[c("title", "release_date", "vote_average", "vote_count")]
+
+knitr::kable(table)
+
+```
+
